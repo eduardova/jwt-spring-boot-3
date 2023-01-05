@@ -1,0 +1,23 @@
+# Use "root" as user
+version: '3.1'
+
+services:
+
+  db:
+    image: mariadb
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: Password1.a12
+      MYSQL_DATABASE: test
+      MYSQL_USER: simpleuser
+      MYSQL_PASSWORD: Password1.a12
+    ports:
+      - 3306:3306
+    volumes:
+      - ./data:/var/lib/mysql
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 9090:8080
