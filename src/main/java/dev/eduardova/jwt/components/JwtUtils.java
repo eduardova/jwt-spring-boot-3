@@ -5,32 +5,40 @@ import dev.eduardova.jwt.exceptions.GeneralInputErrorException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import java.security.Key;
 import java.util.Collection;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
-
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @Component
 public class JwtUtils {
-    
+
     private static final String AUTHORITIES = "authorities";
 
-    @Value("${configs.security.secret-key}")
-    private String secretKey;
-    
-    @Value("${configs.security.ttl-access-token:60}")
-    private Long ttlAccessToken;
+    private final Long ttlAccessToken;
+    private final Long ttlRefreshToken;
+    private final Key key;
 
-    @Value("${configs.security.ttl-refresh-token:240}")
-    private Long ttlRefreshToken;
+    @Autowired
+    public JwtUtils(
+        @Value("${configs.security.secret-key}") String secretKey,
+        @Value("${configs.security.ttl-access-token:60}") Long ttlAccessToken,
+        @Value("${configs.security.ttl-refresh-token:240}") Long ttlRefreshToken
+    ) {
+        this.ttlAccessToken = ttlAccessToken;
+        this.ttlRefreshToken = ttlRefreshToken;
+        key = new SecretKeySpec(secretKey.getBytes(), SignatureAlgorithm.HS256.getJcaName());
+    }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -53,7 +61,8 @@ public class JwtUtils {
     }
 
     private Claims extractAllClaims(String token) throws GeneralInputErrorException {
-        return Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody();
+        return Jwts.parserBuilder().setSigningKey(key).build()
+            .parseClaimsJws(token).getBody();
     }
 
     private Boolean isTokenExpired(String token) {
@@ -87,10 +96,9 @@ public class JwtUtils {
     }
 
     private String generateToken(Map<String, Object> claims, String subject, Long minutes) {
-
         return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
             .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * minutes))
-            .signWith(SignatureAlgorithm.HS256, secretKey).compact();
+            .signWith(key, SignatureAlgorithm.HS256).compact();
     }
 
     public Boolean validateAcessToken(String token, UserDetails userDetails) {
